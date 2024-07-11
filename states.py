@@ -13,6 +13,7 @@ class Worker(StatesGroup):
     ad = State()
 
 class Workplace(StatesGroup):
+    id = State()
     department = State()
     position = State()
     old_dep = State()
@@ -24,6 +25,7 @@ class View_Worker(StatesGroup):
 class Ex_Worker(StatesGroup):
     id = State()
     name = State()
+    date_expire = State()
 
 class Edit_Worker(StatesGroup):
     id = State()

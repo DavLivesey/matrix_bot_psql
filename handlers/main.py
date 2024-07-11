@@ -5,6 +5,7 @@ from logging import getLogger
 from datetime import datetime as dt
 from aiogram.enums import ParseMode
 from config import ADMIN_CHAT
+import datetime as dt
 
 LOG = getLogger()
 
@@ -16,23 +17,28 @@ class DBCommands:
                         '(select id FROM mailbox m WHERE m.mailbox_name=$2))'
     #Блок изменения информации о работниках
     ADD_NEW_WORKER = 'INSERT INTO workers (fullname) VALUES ($1)'
-    ADD_DEP = 'UPDATE workers w SET "department"=$2 WHERE id=$1'
+    GET_WORKER_ID = 'SELECT id FROM workers w WHERE w.fullname=$1'    
     DELETE_WORKER = 'DELETE FROM workers WHERE id=$1'
+    VIEW_WORKER_FOR_ADDING = 'SELECT * FROM workers w WHERE w.fullname=$1'
     VIEW_WORKER = 'SELECT * FROM workers w WHERE w.fullname LIKE $1' 
     VIEW_WORKER_ON_ID = 'SELECT * FROM workers WHERE id=$1'
-    VIEW_WORKER_POSITIONS = 'SELECT w.fullname, d.dep_name, p.pos_name FROM workplaces wp ' \
+    VIEW_WORKER_POSITIONS = 'SELECT w.fullname, d.dep_name, p.pos_name, wp.date_start, wp.employment, '\
+                            'wp.expired, date_expire FROM workplaces wp ' \
                             'JOIN workers w ON wp.worker_id = w.id ' \
                             'JOIN departments d ON wp.dep_id =d.id ' \
                             'JOIN positions p ON wp.pos_id =p.id ' \
                             'WHERE w.fullname = $1'
-    VIEW_WORKER_POSITIONS_ID = 'SELECT w.fullname, d.dep_name, p.pos_name FROM workplaces wp ' \
+    VIEW_WORKER_POSITIONS_ID = 'SELECT w.fullname, d.dep_name, p.pos_name, wp.date_start, wp.id FROM workplaces wp ' \
                             'JOIN workers w ON wp.worker_id = w.id ' \
                             'JOIN departments d ON wp.dep_id =d.id ' \
                             'JOIN positions p ON wp.pos_id =p.id ' \
-                            'WHERE w.id = $1'    
+                            'WHERE w.id = $1'
+    RECOVER_WORKPLACE = 'UPDATE workplaces wp SET expired=False WHERE wp.id=$1'  
     CHECK_WORKER = 'SELECT EXISTS (SELECT * FROM workers w WHERE w.fullname=$1)'
     FIND_WORKER = 'SELECT fullname FROM workers WHERE id = $1'
     EDIT_WORKER_FIO = 'UPDATE workers w SET "fullname"=$2 WHERE id=$1'
+    EXPIRE_WORKER = 'UPDATE workplaces wp set expired=True, date_expire=$2 '\
+                     'WHERE wp.worker_id=$1'
     ADD_APTEKA = "UPDATE workers SET APTEKA='Да' where id=$1"
     ADD_HR = "UPDATE workers SET ZKGU='Да' where id=$1"
     ADD_BGU_1 = "UPDATE workers SET BGU_1='Да' where id=$1"
@@ -50,6 +56,7 @@ class DBCommands:
     DELETE_TIS = "UPDATE workers SET TIS='Нет' where id=$1"
     DELETE_SED = "UPDATE workers SET SED='Нет' where id=$1"
     EDIT_EMAIL = 'UPDATE workers SET EMAIL=$2 where id=$1'
+    ADD_AD = 'UPDATE workers SET "ad"=$2 WHERE id=$1'
     ADD_NEW_PHONE = 'INSERT INTO phones (phone_number) VALUES ($1)'
     ADD_PHONE = 'INSERT INTO connections (worker_id, phone_id) '\
                 'VALUES ($1, (select id FROM phones WHERE phones.phone_number=$2))'
@@ -76,16 +83,20 @@ class DBCommands:
                   'WHERE w.id = $1'
     CHECK_MAILBOX_LIST = 'SELECT EXISTS (SELECT m.id FROM mailbox m WHERE m.mailbox_name= $1)'
     REMOVE_MAILBOX = 'DELETE FROM workmails wm WHERE wm.worker_id=$1 and '\
-                        'wm.mail_id=(SELECT id FROM mailbox m WHERE m.mailbox_name=$2)'
-    ADD_AD = 'UPDATE workers SET "ad"=$2 WHERE id=$1'
+                        'wm.mail_id=(SELECT id FROM mailbox m WHERE m.mailbox_name=$2)'    
     ADD_NEW_POSITION = 'INSERT INTO positions (pos_name) VALUES ($1)'
     JOIN_POSITION = 'INSERT INTO workplaces (worker_id, pos_id, dep_id) ' \
                     'VALUES ($1, (select id FROM positions p WHERE p.pos_name=$2), '\
                     '(SELECT id FROM departments d WHERE d.dep_name=$3))'
     CHECK_IS_POSITION = 'SELECT EXISTS (SELECT * FROM positions p WHERE p.pos_name=$1)'
-    LEAVE_POSITION = 'DELETE FROM workplaces wp WHERE wp.worker_id=$1 and '\
-                        'wp.pos_id=(SELECT id FROM positions p WHERE p.pos_name=$2) and '\
-                        'wp.dep_id=(SELECT id FROM departments d WHERE d.dep_name=$3)'
+    EDIT_POSITION = 'update workplaces wp set date_start=$4, employment=$5 '\
+                    'WHERE wp.worker_id=$1 and '\
+                    'wp.pos_id=(SELECT id FROM positions p WHERE p.pos_name=$2) and '\
+                    'wp.dep_id=(SELECT id FROM departments d WHERE d.dep_name=$3)'
+    LEAVE_POSITION = 'UPDATE workplaces wp set expired=True, date_expire=$4 '\
+                     'WHERE wp.worker_id=$1 and '\
+                     'wp.pos_id=(SELECT id FROM positions p WHERE p.pos_name=$2) and '\
+                     'wp.dep_id=(SELECT id FROM departments d WHERE d.dep_name=$3)'
     ADD_NEW_DEP = 'INSERT INTO departments (dep_name) VALUES ($1)'
     CHECK_IS_DEP = 'SELECT EXISTS (SELECT * FROM departments WHERE dep_name LIKE $1)'
     
@@ -197,7 +208,7 @@ class DBCommands:
             access_dict['СЭД'] = person[9]
             access_dict['МИС'] = person[7]
             access_dict['ТИС'] = person[8]
-            access_dict['ad'] = person[13]
+            access_dict['ad'] = person[11]
             for key, value in access_dict.items():                                                 #Если в словаре access_dict значение было изменено,
                 if value != 'Нет' and value != '':                                                 #добавляет в список название ключа
                     person_list.append(key)
@@ -229,7 +240,18 @@ class DBCommands:
         for sec in sec_list:
             result_sec += f'{sec}\n'
         for pos in position:
-            result_positions += f'{pos[1]}\n<i>{pos[2]}</i>\n\n'
+            try:
+                date_start = dt.datetime.strftime(pos[3], '%d-%m-%Y')
+                employment = pos[4]
+            except TypeError:
+                date_start = 'не указано'
+                date_expire = 'не указано'
+                employment = 'Вид занятости не указан'
+            if pos[5] == True:
+                date_expire = dt.datetime.strftime(pos[6], '%d-%m-%Y')
+                result_positions += f'{pos[1]}\n<i>{pos[2]}</i>\n{employment}\nТрудоустройство: {date_start}\nДата увольнения: {date_expire}\n\n'
+            else:
+                result_positions += f'{pos[1]}\n<i>{pos[2]}</i>\nТрудоустройство: {date_start}\n{employment}\n\n'
         if role in full_roles:
             message = f'{person[1]}\n{result_positions}\n{result_contacts}\n{result_phones}\n{result_mailboxes}\n'\
                                             f'{result_sec}\n\n<b>Доступы:</b>\n{list_person}\n\n' \
@@ -241,15 +263,15 @@ class DBCommands:
             message = f'{person[1]}\n{result_positions}\n{result_contacts}\n{result_phones}'
         return message
 
-    async def add_new_worker(self, fullname, user_id):
+    async def add_new_worker(self, fullname, user_id, role):
         #Создание записи о работнике
         arg = fullname
         command_1 = self.CHECK_WORKER
         command_2 = self.ADD_NEW_WORKER
         worker_boolean = await DataBase.execute(command_1, arg, fetchval=True)
         if worker_boolean:
-            await bot.send_message(chat_id=user_id, text='Такой пользователь уже сущестует')
-            await self.view_worker(fullname, user_id)
+            await bot.send_message(chat_id=user_id, text='Такой сотрудник числится в базе')
+            await self.view_ex_worker(fullname, user_id, role)
             return False
         else:
             await DataBase.execute(command_2, arg, execute=True)
@@ -257,23 +279,46 @@ class DBCommands:
 
     async def check_worker(self, fullname, user):
         #Проверка наличия записи о сотруднике по ФИО
-        arg = f"%{fullname}%"
-        command = self.VIEW_WORKER
+        arg = fullname
+        command = self.VIEW_WORKER_FOR_ADDING
         result = await DataBase.execute(command, arg, fetch=True)
-        worker = result
-        if len(worker) > 1:
+        if len(result) == 1:
             await bot.send_message(chat_id=user, text='Пользователь с такими ФИО уже существует')
-        else:
-            return worker[0]
+        elif len(result) > 1:
+            await bot.send_message(chat_id=user, text='Пользователей с такими ФИО слишком много, уточните данные')
+        return result[0]
 
     async def view_worker(self, fullname, user, role):
         #Просмотр карточки работника без ID
         arg = f"%{fullname}%"
         view_command = self.VIEW_WORKER
         position_command = self.VIEW_WORKER_POSITIONS
-        worker = await DataBase.execute(view_command, arg, fetch=True) 
-        if len(worker) > 0:
-            await bot.send_message(chat_id=user, text=f'По Вашему запросу найдено {len(worker)} пользователей:')           
+        worker = await DataBase.execute(view_command, arg, fetch=True)
+        if len(worker) > 0:         
+            for work in worker:
+                position = await DataBase.execute(position_command, work[1], fetch=True)
+                list_of_positions = []
+                for pos in position:
+                    if pos[5] == False:
+                       list_of_positions.append(pos)
+                if list_of_positions == []:
+                    continue
+                reading_result = await self.read_worker(work)
+                message = await self.make_answer(reading_result[0], reading_result[1], reading_result[2], \
+                                                 reading_result[3], reading_result[4], reading_result[5], \
+                                                reading_result[6], role, list_of_positions)                
+                await bot.send_message(chat_id=user, text=message, parse_mode=ParseMode.HTML)
+            return True
+        else:
+            await bot.send_message(chat_id=user, text='Такого пользователя нет в базе или ФИО написано неверно, попробуйте еще раз')
+        
+    async def view_ex_worker(self, fullname, user, role):
+        #Просмотр карточки работника без ID
+        arg = f"%{fullname}%"
+        view_command = self.VIEW_WORKER
+        position_command = self.VIEW_WORKER_POSITIONS
+        worker = await DataBase.execute(view_command, arg, fetch=True)
+        if len(worker) > 0:         
             for work in worker:
                 position = await DataBase.execute(position_command, work[1], fetch=True)
                 reading_result = await self.read_worker(work)
@@ -281,23 +326,14 @@ class DBCommands:
                                                  reading_result[3], reading_result[4], reading_result[5], \
                                                 reading_result[6], role, position)                
                 await bot.send_message(chat_id=user, text=message, parse_mode=ParseMode.HTML)
-            return True
-        else:
-            await bot.send_message(chat_id=user, text='Такого пользователя нет в базе или ФИО написано неверно, попробуйте еще раз')
     
     async def get_worker_card(self, id, user):
         #Просмотр карточки уволенного сотрудника
         arg = id
         command = self.VIEW_WORKER_ON_ID
-        position_command = self.VIEW_WORKER_POSITIONS_ID
         worker = await DataBase.execute(command, arg, fetch=True)
-        position = await DataBase.execute(position_command, arg, fetch=True)
-        reading_result = await self.read_worker(worker[0])
-        message = await self.make_answer(reading_result[0], reading_result[1], reading_result[2], \
-                                                 reading_result[3], reading_result[4], reading_result[5], \
-                                                     reading_result[6], 'admin', position)
         await bot.send_message(chat_id=ADMIN_CHAT, text=f'{user.first_name} {user.last_name} под ником @{user.username} '\
-                                                        f'удалил запись  о \n\n{message}', \
+                                                        f'провёл увольнение сотрудника \n\n{worker[0][1]}', \
                                                         parse_mode=ParseMode.HTML)
 
     async def view_worker_with_id(self, fullname, user, role):
@@ -305,16 +341,22 @@ class DBCommands:
         arg = f"%{fullname}%"
         view_command = self.VIEW_WORKER
         position_command = self.VIEW_WORKER_POSITIONS
-        worker = await DataBase.execute(view_command, arg, fetch=True)         
+        worker = await DataBase.execute(view_command, arg, fetch=True)  
         if len(worker) > 0:
             await bot.send_message(chat_id=user, text=f'По Вашему запросу найдено {len(worker)} пользователей:')
             persons_id_list = []
             for work in worker:
-                position = await DataBase.execute(position_command, work[1], fetch=True)        
+                position = await DataBase.execute(position_command, work[1], fetch=True)
+                list_of_positions = []
+                for pos in position:
+                    if pos[5] == False:
+                       list_of_positions.append(pos)
+                if list_of_positions == []:
+                    continue
                 reading_result = await self.read_worker(work)
                 message = await self.make_answer(reading_result[0], reading_result[1], reading_result[2], \
                                                  reading_result[3], reading_result[4], reading_result[5],\
-                                                     reading_result[6], role, position)
+                                                     reading_result[6], role, list_of_positions)
                 await bot.send_message(chat_id=user, text=f'ID = {reading_result[0][0]}\n\n{message}', parse_mode=ParseMode.HTML)
                 persons_id_list.append(reading_result[0][0])
             return persons_id_list
@@ -331,6 +373,18 @@ class DBCommands:
                         'СЭД': worker[0][9]}
         return person_data
 
+    async def get_worker_positions(self, worker_id):
+        #Получение списка рабочих мест сотрудника
+        arg = worker_id
+        command = self.VIEW_WORKER_POSITIONS_ID
+        positions = await DataBase.execute(command, arg, fetch=True)
+        return positions
+    
+    async def recover_workplace(self, workplace_id):
+        arg = workplace_id
+        command = self.RECOVER_WORKPLACE
+        await DataBase.execute(command, arg, execute=True)
+    
 #Далее идет блок добавления/удаления информации о наличии доступа к ИС
     async def plus_MIS(self, id):
         arg = int(id)
@@ -473,6 +527,12 @@ class DBCommands:
         command = self.REMOVE_MAILBOX
         args = (int(worker_id), mailbox)
         await DataBase.execute(command, *args, execute=True)
+    
+    async def expire_worker(self, worker_id, date_expire):
+        command = self.EXPIRE_WORKER
+        args = (int(worker_id), date_expire)
+        await DataBase.execute(command, *args, execute=True)
+        return True
 
     async def del_worker(self, id):
         arg = int(id)
@@ -513,9 +573,10 @@ class DBCommands:
         existing = 0
         pos_exist = await self.check_position(pos_name)
         dep_exist = await self.check_dep(dep_name)
+        date_finish = dt.datetime.now()
         if pos_exist:
             if dep_exist:
-                args = (int(worker_id), pos_name, dep_name)
+                args = (int(worker_id), pos_name, dep_name, date_finish)
                 command = self.LEAVE_POSITION
                 await DataBase.execute(command, *args, execute=True)
             else:

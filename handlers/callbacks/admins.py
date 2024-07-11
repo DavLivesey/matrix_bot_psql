@@ -1,6 +1,7 @@
 from aiogram import types, Router, F
 from aiogram.fsm.context import FSMContext
 import logging
+import datetime as dt
 from config import ADMIN_CHAT
 from states import Worker, Ex_Worker, Workplace
 from aiogram.types.inline_keyboard_button import InlineKeyboardButton
@@ -8,7 +9,8 @@ from aiogram.types.inline_keyboard_markup import InlineKeyboardMarkup
 from keyboards.admins_keys import admin_keyboard, AdminCallback, \
         AdminDeleteCallback, edit_keyboard, cancel_keyboard, \
             cancel_button, one_plus_keuboard, security_keyboard, \
-            edit_dep_keyboard, edit_mailbox, edit_phone
+            edit_dep_keyboard, edit_mailbox, edit_phone, \
+            recover_worker, RecoverCallback
 from keyboards.users_keys import user_keyboard
 from handlers.main import DBCommands
 from loader import bot
@@ -106,15 +108,16 @@ async def update_fio(message: types.Message, state: FSMContext):
 
 @admins_router.message(Worker.name)
 async def add_info_sys(message: types.Message, state: FSMContext):
-    adding = await database.add_new_worker(message.text, message.from_user.id)
+    user = message.from_user.id
+    role = await database.check_user_role(user)
+    adding = await database.add_new_worker(message.text, message.from_user.id, role)
+    person_data = await database.check_worker(message.text, user)
+    await state.update_data(id=person_data[0])
     if adding==True:
-        user = message.from_user.id
         autor = message.from_user
         await bot.send_message(chat_id=ADMIN_CHAT, text=f"Пользователь {autor.first_name} "\
                                 f"{autor.last_name} под ником @{autor.username} создал запись о сотруднике {message.text}",
                                   parse_mode=ParseMode.HTML)
-        person_data = await database.check_worker(message.text, user)
-        await state.update_data(id=person_data[0])
         items_list = []
         calls_list = []
         for acc in person_data[1::]:
@@ -149,9 +152,33 @@ async def add_info_sys(message: types.Message, state: FSMContext):
         )
     else:
         await message.answer(
-        text='Проверьте правильность ФИО нового пользователя или отредактируйте текущего', reply_markup=admin_keyboard)
+        text=f'Вы хотите восстановить сотрудника {person_data[1]}?', reply_markup=recover_worker)
 
-@admins_del_router.callback_query(AdminDeleteCallback.filter(F.text == "delete_worker"))
+@admins_router.callback_query(AdminCallback.filter(F.text == "recover"))
+async def get_list_positions(call: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    positions = await database.get_worker_positions(data['id'])
+    buttons = []
+    for position in positions:
+                buttons.append(InlineKeyboardButton(text=f"{position[4]}",callback_data=RecoverCallback(text=f"{position[4]}").pack()))
+                await call.message.answer(text=f'ID = {position[4]}\n{position[1]}\n{position[2]}')
+    await state.set_state(Workplace.id)
+    await call.message.answer(
+                text='Нажмите ID восстанавливаемого места',
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=
+                                                                   [
+                                                                       buttons
+                                                                   ])
+                                                                   )
+
+@admins_router.callback_query(Workplace.id)
+async def recover_workplace(call: types.CallbackQuery):
+    workplace_id = call.data[8::]
+    await database.recover_workplace(int(workplace_id))
+    await call.message.answer(text="Сотрудник восстановлен",
+                         reply_markup=admin_keyboard)
+
+@admins_del_router.callback_query(AdminDeleteCallback.filter(F.text == "expire_worker"))
 async def check_worker_name(call: types.CallbackQuery, state: FSMContext):
     await state.clear()
     user = call.message.chat
@@ -196,14 +223,22 @@ async def get_id_for_names(message: types.Message, state: FSMContext):
 
 @admins_del_router.callback_query(Ex_Worker.id)
 async def get_id_for_names(call: types.CallbackQuery, state: FSMContext):
-    await database.view_worker_for_edition(call.data[6::])
-    await database.get_worker_card(int(call.data[6::]), call.message.chat)
-    result = await database.del_worker(call.data[6::])
+    await state.update_data(id=call.data[6::])
+    await state.set_state(Ex_Worker.date_expire)
+    await call.message.answer(text='Введите дату увольнения', reply_markup=cancel_keyboard)
+
+@admins_del_router.message(Ex_Worker.date_expire)
+async def get_data_exworker(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    date_expire = dt.datetime.strptime(message.text, '%d%m%Y')
+    await database.view_worker_for_edition(data['id'])
+    result = await database.expire_worker(data['id'], date_expire)
     if result ==True:
-        await call.message.answer(text='✅ Пользователь успешно удален', reply_markup=admin_keyboard)
+        await database.get_worker_card(int(data['id']), message.chat)
+        await message.answer(text='✅ Сотрудник уволен', reply_markup=admin_keyboard)
         await state.clear()
     else:
-        await call.message.answer(text='Что-то пошло не так, попробуйте ещё раз', reply_markup=admin_keyboard)
+        await message.answer(text='Что-то пошло не так, попробуйте ещё раз', reply_markup=admin_keyboard)
 
 @admins_router.callback_query(AdminCallback.filter(F.text == 'edit_dep'))
 async def choise_dep_edit(call: types.CallbackQuery):

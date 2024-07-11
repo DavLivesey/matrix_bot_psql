@@ -19,16 +19,19 @@ class EditCallback(callback_data.CallbackData, prefix='editor'):
 class SertCallback(callback_data.CallbackData, prefix='sertificat'):
     text: str
 
+class RecoverCallback(callback_data.CallbackData, prefix='recover'):
+    text: str
+
 #основная клавиатура админов
 admin_keyboard = InlineKeyboardMarkup(inline_keyboard=
     [
     [  
-        InlineKeyboardButton(text="Создать пользователя", callback_data=AdminCallback(text='add_worker').pack()),
-        InlineKeyboardButton(text="Посмотреть пользователя", callback_data=UserCallback(text='see_worker').pack())
+        InlineKeyboardButton(text="Создать сотрудника", callback_data=AdminCallback(text='add_worker').pack()),
+        InlineKeyboardButton(text="Посмотреть сотрудника", callback_data=UserCallback(text='see_worker').pack())
     ],
     [
-        InlineKeyboardButton(text="Редактировать пользователя", callback_data=AdminCallback(text="edit_worker").pack()),
-        InlineKeyboardButton(text='Удалить пользователя', callback_data=AdminDeleteCallback(text='delete_worker').pack())
+        InlineKeyboardButton(text="Редактировать сотрудника", callback_data=AdminCallback(text="edit_worker").pack()),
+        InlineKeyboardButton(text='Сотрудник уволен', callback_data=AdminDeleteCallback(text='expire_worker').pack())
     ],
     [
         InlineKeyboardButton(text='Посмотреть кончающиеся сертификаты', callback_data=AdminCallback(text='end_sert').pack())
@@ -150,6 +153,14 @@ edit_phone = InlineKeyboardMarkup(inline_keyboard=[
                                                                 InlineKeyboardButton(text='Убрать', callback_data=AdminCallback(text='del_phone').pack())
                                                             ],
                                                             [
+                                                                cancel_button
+                                                            ]
+])
+
+#клавиатура восстановления уволенного сотрудника
+recover_worker = InlineKeyboardMarkup(inline_keyboard=[
+                                                            [
+                                                                InlineKeyboardButton(text='Восстановить', callback_data=AdminCallback(text='recover').pack()),
                                                                 cancel_button
                                                             ]
 ])
