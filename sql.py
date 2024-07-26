@@ -3,9 +3,8 @@ from typing import Union
 import asyncio
 import logging
 import asyncpg
-from asyncpg import Connection
 from asyncpg.pool import Pool
-from config import HOST, PG_PSWD, PG_USER, PATH_TO_BASES, PROJECT_DESTINATION
+from config import HOST, PG_PSWD, PG_USER
 
 logging.basicConfig(format=u'%(filename)s [LINE:%(lineno)d] #%(levelname)-8s'
                            u'[%(asctime)s]  %(message)s',

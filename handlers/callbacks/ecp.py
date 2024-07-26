@@ -3,7 +3,7 @@ import datetime
 from aiogram import types, Router, F
 from aiogram.fsm.context import FSMContext
 import logging, operator
-from config import ADMIN_LIST, ADMIN_CHAT
+from config import ADMIN_CHAT
 from states import Worker, Ex_Worker, Edit_Worker, sertificate
 from aiogram.types.inline_keyboard_button import InlineKeyboardButton
 from aiogram.types.inline_keyboard_markup import InlineKeyboardMarkup

@@ -2,7 +2,6 @@
 from loader import bot
 from sql import DataBase
 from logging import getLogger
-from datetime import datetime as dt
 from aiogram.enums import ParseMode
 from config import ADMIN_CHAT
 import datetime as dt
@@ -23,7 +22,7 @@ class DBCommands:
     VIEW_WORKER = 'SELECT * FROM workers w WHERE w.fullname LIKE $1' 
     VIEW_WORKER_ON_ID = 'SELECT * FROM workers WHERE id=$1'
     VIEW_WORKER_POSITIONS = 'SELECT w.fullname, d.dep_name, p.pos_name, wp.date_start, wp.employment, '\
-                            'wp.expired, date_expire FROM workplaces wp ' \
+                            'wp.expired, wp.date_expire, wp.date_blocking FROM workplaces wp ' \
                             'JOIN workers w ON wp.worker_id = w.id ' \
                             'JOIN departments d ON wp.dep_id =d.id ' \
                             'JOIN positions p ON wp.pos_id =p.id ' \
@@ -39,22 +38,22 @@ class DBCommands:
     EDIT_WORKER_FIO = 'UPDATE workers w SET "fullname"=$2 WHERE id=$1'
     EXPIRE_WORKER = 'UPDATE workplaces wp set expired=True, date_expire=$2 '\
                      'WHERE wp.worker_id=$1'
-    ADD_APTEKA = "UPDATE workers SET APTEKA='Да' where id=$1"
-    ADD_HR = "UPDATE workers SET ZKGU='Да' where id=$1"
-    ADD_BGU_1 = "UPDATE workers SET BGU_1='Да' where id=$1"
-    ADD_BGU_2 = "UPDATE workers SET BGU_2='Да' where id=$1"
-    ADD_DIETA = "UPDATE workers SET DIETA='Да' where id=$1"
-    ADD_MIS = "UPDATE workers SET MIS='Да' where id=$1"
-    ADD_TIS = "UPDATE workers SET TIS='Да' where id=$1"
-    ADD_SED = "UPDATE workers SET SED='Да' where id=$1"
-    DELETE_APTEKA = "UPDATE workers SET APTEKA='Нет' where id=$1"
-    DELETE_HR = "UPDATE workers SET ZKGU='Нет' where id=$1"
-    DELETE_BGU_1 = "UPDATE workers SET BGU_1='Нет' where id=$1"
-    DELETE_BGU_2 = "UPDATE workers SET BGU_2='Нет' where id=$1"
-    DELETE_DIETA = "UPDATE workers SET DIETA='Нет' where id=$1"
-    DELETE_MIS = "UPDATE workers SET MIS='Нет' where id=$1"
-    DELETE_TIS = "UPDATE workers SET TIS='Нет' where id=$1"
-    DELETE_SED = "UPDATE workers SET SED='Нет' where id=$1"
+    ADD_APTEKA = "UPDATE workers SET APTEKA='True' where id=$1"
+    ADD_HR = "UPDATE workers SET ZKGU='True' where id=$1"
+    ADD_BGU_1 = "UPDATE workers SET BGU_1='True' where id=$1"
+    ADD_BGU_2 = "UPDATE workers SET BGU_2='True' where id=$1"
+    ADD_DIETA = "UPDATE workers SET DIETA='True' where id=$1"
+    ADD_MIS = "UPDATE workers SET MIS='True' where id=$1"
+    ADD_TIS = "UPDATE workers SET TIS='True' where id=$1"
+    ADD_SED = "UPDATE workers SET SED='True' where id=$1"
+    DELETE_APTEKA = "UPDATE workers SET APTEKA='False' where id=$1"
+    DELETE_HR = "UPDATE workers SET ZKGU='False' where id=$1"
+    DELETE_BGU_1 = "UPDATE workers SET BGU_1='False' where id=$1"
+    DELETE_BGU_2 = "UPDATE workers SET BGU_2='False' where id=$1"
+    DELETE_DIETA = "UPDATE workers SET DIETA='False' where id=$1"
+    DELETE_MIS = "UPDATE workers SET MIS='False' where id=$1"
+    DELETE_TIS = "UPDATE workers SET TIS='False' where id=$1"
+    DELETE_SED = "UPDATE workers SET SED='False' where id=$1"
     EDIT_EMAIL = 'UPDATE workers SET EMAIL=$2 where id=$1'
     ADD_AD = 'UPDATE workers SET "ad"=$2 WHERE id=$1'
     ADD_NEW_PHONE = 'INSERT INTO phones (phone_number) VALUES ($1)'
@@ -142,19 +141,8 @@ class DBCommands:
         #2.list_person - список доступов работника
         #3.list_sert - список сертификатов работника
         #4.contacts_list - список контактов открытого доступа (телефон, электронная почта)
-        #5.sec_list - список закрытых контактов (учетка в компьютер, участие в почтовых рассылках)
-            access_dict = {
-                '1С_Аптека': 'Нет',
-                '1С_Диетпитание': 'Нет',
-                '1С_ЗКГУ': 'Нет',
-                '1С_БГУ 1.0': 'Нет',
-                '1С_БГУ 2.0': 'Нет',
-                'СЭД': 'Нет',
-                'МИС': 'Нет',
-                'ТИС': 'Нет',
-                'email': 'Нет',
-                'ad': 'Нет',
-                }
+        #5.sec_list - список закрытых контактов (учетка в компьютер, участие в почтовых рассылках)            
+            access_dict = {}
             phone_arg = person[1]
             phone_command = self.GET_PHONE
             phone_list = []
@@ -187,9 +175,9 @@ class DBCommands:
             sert_num = 1
             for sert in worker_sert:                                                                    #Для каждого сертификта формируем отдельную читабельную карточку
                 if sert[6]==True:
-                    date_start = dt.strftime(sert[4], '%d-%m-%Y')
-                    date_finish = dt.strftime(sert[5], '%d-%m-%Y')
-                    if sert[5] < dt.today().date():
+                    date_start = dt.datetime.strftime(sert[4], '%d-%m-%Y')
+                    date_finish = dt.datetime.strftime(sert[5], '%d-%m-%Y')
+                    if sert[5] < dt.datetime.today().date():
                         date_item = '❌'
                     else:
                         date_item = '✅'
@@ -210,7 +198,7 @@ class DBCommands:
             access_dict['ТИС'] = person[8]
             access_dict['ad'] = person[11]
             for key, value in access_dict.items():                                                 #Если в словаре access_dict значение было изменено,
-                if value != 'Нет' and value != '':                                                 #добавляет в список название ключа
+                if value:                                                                          #добавляет в список название ключа
                     person_list.append(key)
             if 'email' in person_list:                                                             #Если в списке оказалась почта, в список contacts_list
                 contacts_list.append(f'email -  {access_dict["email"]}')                           #добавляется текст с ее значением, а из списка person_list email удаляется
@@ -249,7 +237,10 @@ class DBCommands:
                 employment = 'Вид занятости не указан'
             if pos[5] == True:
                 date_expire = dt.datetime.strftime(pos[6], '%d-%m-%Y')
-                result_positions += f'{pos[1]}\n<i>{pos[2]}</i>\n{employment}\nТрудоустройство: {date_start}\nДата увольнения: {date_expire}\n\n'
+                reason_expire = f'Уволился с {date_expire}'
+                if date_expire == '01-01-1':
+                    reason_expire = f'Ушла в декрет c {pos[7]}'
+                result_positions += f'{pos[1]}\n<i>{pos[2]}</i>\n{employment}\nТрудоустройство: {date_start}\n{reason_expire}\n\n'
             else:
                 result_positions += f'{pos[1]}\n<i>{pos[2]}</i>\nТрудоустройство: {date_start}\n{employment}\n\n'
         if role in full_roles:
@@ -299,7 +290,11 @@ class DBCommands:
                 position = await DataBase.execute(position_command, work[1], fetch=True)
                 list_of_positions = []
                 for pos in position:
-                    if pos[5] == False:
+                    #print(pos[5] == False)
+                    #print(dt.datetime.combine(pos[6], dt.datetime.min.time()) >= dt.datetime.now())
+                    #print(dt.datetime.combine(pos[6], dt.datetime.min.time()))
+                    #print(dt.datetime.now())
+                    if pos[5] == False or dt.datetime.combine(pos[6], dt.datetime.min.time()) <= dt.datetime.now():
                        list_of_positions.append(pos)
                 if list_of_positions == []:
                     continue
