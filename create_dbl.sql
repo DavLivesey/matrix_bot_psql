@@ -1,6 +1,6 @@
 create table workers
 (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     fullname VARCHAR(255) NOT NULL,
     APTEKA VARCHAR DEFAULT 'Нет',
     ZKGU VARCHAR DEFAULT 'Нет',
@@ -10,12 +10,14 @@ create table workers
     MIS VARCHAR DEFAULT 'Нет',
     TIS VARCHAR DEFAULT 'Нет',
     SED VARCHAR DEFAULT 'Нет',
-    EMAIL VARCHAR DEFAULT 'Нет'
+    EMAIL VARCHAR DEFAULT 'Нет',
+    Department VARCHAR DEFAULT 'Нет',
+    Telephone VARCHAR DEFAULT 'Нет'
 );
 
 create table sertificates
 (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     worker_id INTEGER,
     center_name VARCHAR,
     serial_number INTEGER,

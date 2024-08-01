@@ -1,10 +1,23 @@
+#Модули состояний
+
 from aiogram.fsm.state import StatesGroup, State
 
 class Worker(StatesGroup):
     name = State()
+    new_name = State()
     email = State()
-    department = State()
     phone = State()
+    ex_phone = State()
+    mailbox = State()
+    ex_mailbox = State()
+    ad = State()
+
+class Workplace(StatesGroup):
+    id = State()
+    department = State()
+    position = State()
+    old_dep = State()
+    old_pos = State()
 
 class View_Worker(StatesGroup):
     name = State()
@@ -12,6 +25,7 @@ class View_Worker(StatesGroup):
 class Ex_Worker(StatesGroup):
     id = State()
     name = State()
+    date_expire = State()
 
 class Edit_Worker(StatesGroup):
     id = State()
@@ -24,3 +38,10 @@ class sertificate(StatesGroup):
     worker_id = State()
     date_start = State()
     date_finish = State()
+
+class User_Form(StatesGroup):
+    firstname = State()
+    lastname = State()
+    username = State()
+    user_id = State()
+    role = State()
