@@ -294,7 +294,7 @@ class DBCommands:
                     #print(dt.datetime.combine(pos[6], dt.datetime.min.time()) >= dt.datetime.now())
                     #print(dt.datetime.combine(pos[6], dt.datetime.min.time()))
                     #print(dt.datetime.now())
-                    if pos[5] == False or dt.datetime.combine(pos[6], dt.datetime.min.time()) <= dt.datetime.now():
+                    if pos[5] == False or dt.datetime.combine(pos[6], dt.datetime.min.time()) >= dt.datetime.now():
                        list_of_positions.append(pos)
                 if list_of_positions == []:
                     continue

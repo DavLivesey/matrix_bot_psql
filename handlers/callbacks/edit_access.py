@@ -362,12 +362,12 @@ async def full_keyboard(list_values, chat):
     items_list = []
     calls_list = []
     for acc in list_values[1::]:
-        if acc == 'Нет' or acc == '':
+        if acc == True:
+            items_list.append(items['yes'])
+            calls_list.append(calls["rm"])            
+        else:            
             items_list.append(items['no'])
             calls_list.append(calls["plus"])
-        else:            
-            items_list.append(items['yes'])
-            calls_list.append(calls["rm"])
     await bot.send_message(chat_id=chat,
         text='Выберите из списка',
         reply_markup=InlineKeyboardMarkup(inline_keyboard=
@@ -395,12 +395,12 @@ async def one_plus_actions(list_values, chat):
     items_list = []
     calls_list = []
     for acc in list_values[1::]:
-        if acc == 'Нет' or acc == '':
+        if acc == True:
+            items_list.append(items['yes'])
+            calls_list.append(calls["rm"])            
+        else:            
             items_list.append(items['no'])
             calls_list.append(calls["plus"])
-        else:            
-            items_list.append(items['yes'])
-            calls_list.append(calls["rm"])
     await bot.send_message(chat_id=chat,
         text='Выберите из списка',
         reply_markup=InlineKeyboardMarkup(inline_keyboard=
