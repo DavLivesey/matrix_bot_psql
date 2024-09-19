@@ -8,6 +8,11 @@ import datetime as dt
 
 LOG = getLogger()
 
+items = {
+    'yes': "✅ ",
+    'no': "🚫 "
+}
+
 class DBCommands:
     #Блок забора информации из старой версии базы в новую
     GET_ALL_WORKERS = 'SELECT fullname FROM workers'
@@ -211,7 +216,7 @@ class DBCommands:
             return person, list_person, list_sert, contacts_list, sec_list, phone_list, mailbox_list
             
     async def make_answer(self, person, list_person, list_sert, contacts_list, sec_list, phone_list,\
-                           mailbox_list, role, position):
+                           mailbox_list, role, position, items_list):
         #Создание карточки ответа по сотруднику
         full_roles = ['admin', 'security', 'superuser']
         result_contacts = ''
@@ -227,7 +232,8 @@ class DBCommands:
             result_contacts += f'{contact}\n'
         for sec in sec_list:
             result_sec += f'{sec}\n'
-        for pos in position:
+        items_index = 0
+        for pos in position:            
             try:
                 date_start = dt.datetime.strftime(pos[3], '%d-%m-%Y')
                 employment = pos[4]
@@ -237,12 +243,13 @@ class DBCommands:
                 employment = 'Вид занятости не указан'
             if pos[5] == True:
                 date_expire = dt.datetime.strftime(pos[6], '%d-%m-%Y')
-                reason_expire = f'Уволился с {date_expire}'
+                reason_expire = f'{items_list[items_index]} Уволился с {date_expire}'
                 if date_expire == '01-01-1':
-                    reason_expire = f'Ушла в декрет c {pos[7]}'
+                    reason_expire = f'{items_list[items_index]} Ушла в декрет c {pos[7]}'
                 result_positions += f'{pos[1]}\n<i>{pos[2]}</i>\n{employment}\nТрудоустройство: {date_start}\n{reason_expire}\n\n'
             else:
                 result_positions += f'{pos[1]}\n<i>{pos[2]}</i>\nТрудоустройство: {date_start}\n{employment}\n\n'
+            items_index +=1
         if role in full_roles:
             message = f'{person[1]}\n{result_positions}\n{result_contacts}\n{result_phones}\n{result_mailboxes}\n'\
                                             f'{result_sec}\n\n<b>Доступы:</b>\n{list_person}\n\n' \
@@ -287,21 +294,27 @@ class DBCommands:
         worker = await DataBase.execute(view_command, arg, fetch=True)
         if len(worker) > 0:         
             for work in worker:
+                #print(f"work {work}")
                 position = await DataBase.execute(position_command, work[1], fetch=True)
                 list_of_positions = []
+                items_list = []
                 for pos in position:
+                    #print(f"pos {pos}")
                     #print(pos[5] == False)
-                    #print(dt.datetime.combine(pos[6], dt.datetime.min.time()) >= dt.datetime.now())
-                    #print(dt.datetime.combine(pos[6], dt.datetime.min.time()))
-                    #print(dt.datetime.now())
                     if pos[5] == False or dt.datetime.combine(pos[6], dt.datetime.min.time()) >= dt.datetime.now():
                        list_of_positions.append(pos)
-                if list_of_positions == []:
-                    continue
+                       items_list.append(items['yes'])
+                    else:
+                        list_of_positions.append(pos)
+                        items_list.append(items['no'])
+                #print(list_of_positions)
+                #if list_of_positions == []:
+                #    continue
                 reading_result = await self.read_worker(work)
+                #print(f'reading_result: {reading_result}')
                 message = await self.make_answer(reading_result[0], reading_result[1], reading_result[2], \
                                                  reading_result[3], reading_result[4], reading_result[5], \
-                                                reading_result[6], role, list_of_positions)                
+                                                reading_result[6], role, list_of_positions, items_list)                
                 await bot.send_message(chat_id=user, text=message, parse_mode=ParseMode.HTML)
             return True
         else:
